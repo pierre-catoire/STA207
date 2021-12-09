@@ -1,0 +1,329 @@
+---
+title: "Main"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## TD variables latentes
+
+```{r}
+library(lava)
+library(BiocManager)
+library(Rgraphviz)
+library(dplyr)
+```
+
+```{r}
+m = lvm()
+regression(m) = Y ~ X
+latent(m) = ~ U
+covariance(m) = U ~ V
+
+plot(m)
+```
+
+```{r}
+plot(m,diag=TRUE)
+plot(m,labels=TRUE,diag=TRUE)
+```
+
+```{r}
+summary(m)
+```
+
+```{r}
+regression(m)
+covariance(m)
+intercept(m)
+```
+
+```{r}
+mfit = estimate(m,data=mydata)
+```
+
+```{r}
+intercept(m,~ U + V) = 0 # fixe l'intercept de U et V à 0
+covariance(m, ~ U+V) = 1 # fixe les variances de U et V à 1
+```
+
+### Objectif
+
+#### Définition du modèle
+
+```{r}
+rm(m)
+
+m = lvm()
+latent(m) = ~ u1
+latent(m) = ~ u2
+regression(m) = y1 + y2 + y3 ~ u1
+regression(m) = z1 + z2 + z3 ~ u2
+regression(m) = u1 ~ x1 + x2
+regression(m) = u2 ~ x1 + x2
+covariance(m) = u1 ~ u2
+plot(m)
+```
+
+#### Identifiabilité du modèle
+
+```{r}
+intercept(m,~ u1 + u2) = 0
+covariance(m, ~ u1 + u2) = 1
+```
+
+#### Transformation de la corrélation entre u1 et u2 en une régression de u1 sur u2
+
+```{r}
+regression(m) = u1 ~ u2
+```
+
+#### Ecriture du modèle
+
+```{r}
+rm(m)
+
+m = lvm()
+latent(m) = ~ u1
+latent(m) = ~ u2
+regression(m) = y1 + y2 + y3 ~ u1
+regression(m) = z1 + z2 + z3 ~ u2
+regression(m) = u1 ~ x1 + x2
+regression(m) = u2 ~ x1 + x2
+covariance(m) = u1 ~ u2
+plot(m)
+```
+
+Modèle structurel
+
+$$
+u_{1i} = \beta_{0_{u_1}} + \beta_{1_{u_1}}x_1 + \beta_{2_{u_1}}x_2  + \gamma_{1_i} \\ 
+u_{2i} = \beta_{0_{u_2}} + \beta_{1_{u_2}}x_1 + \beta_{2_{u_2}}x_2 + \gamma_{2_i}
+$$
+
+avec 
+
+$$
+\gamma_{1_i} \sim \mathcal{N}\big(0,\sigma^2_{\gamma_{1_i}}\big)\\
+\gamma_{2_i} \sim \mathcal{N}\big(0,\sigma^2_{\gamma_{2_i}}\big)\\
+cov(\gamma_{1_i},\gamma_{2_i}) = \sigma_{\gamma_{1,2_i}}\neq 0\\
+$$
+Modèle d'observation
+
+$$
+Y = \begin{pmatrix}y_{i_1} \\ y_2 \\ y_3 \end{pmatrix} = \alpha_{0_Y} + \alpha_{1_Y} u_{i_1} + \epsilon_{Y_i} \\
+Z = \begin{pmatrix}z_{i_1} \\ z_2 \\ z_3 \end{pmatrix} = \alpha_{0_Z} + \alpha_{1_Z} u_{i_2} + \epsilon_{Z_i} \\
+$$
+
+avec 
+
+$$
+\epsilon_Y \sim \mathcal{N}\Bigg( \begin{pmatrix}0\\0\\0\end{pmatrix}, \Sigma_{\epsilon_Y}\Bigg) \\
+\epsilon_Z \sim \mathcal{N}\Bigg( \begin{pmatrix}0\\0\\0\end{pmatrix}, \Sigma_{\epsilon_Z}\Bigg)
+$$
+
+$\Sigma_{\epsilon_Y}$ et $\Sigma_{\epsilon_Z}$ sont deux matrices diagonales (les erreurs sont indépendantes entre elles).
+
+On a donc :
+
+- 3 paramètres pour les coefficients de $\beta_{u_1}$
+- 3 paramètres pour les coefficients de $\alpha_{u_2}$
+- 3 paramètres pour la matrice de variance-covariance de $\gamma$
+- 3 paramètres pour les coefficients de $\alpha_{0_Y}$
+- 3 paramètres pour les coefficients de $\alpha_{1_Y}$
+- 3 paramètres pour les coefficients de $\alpha_{0_Z}$
+- 3 paramètres pour les coefficients de $\alpha_{1_Z}$
+- 3 paramètres pour la matrice de variance-covariance de $\epsilon_Y$
+- 3 paramètres pour la matrice de variance-covariance de $\epsilon_Z$
+
+Soit 27 paramètres.
+
+### Partie B
+
+#### Objectif de l'étude
+
+L’objectif est de décrire le niveau cognitif de personnes âgées en fonction de différentes variables explicatives. Le niveau cognitif est mesuré par plusieurs tests de cognition: le MMSE, le set test d’Isaacs, le test de rétention visuelle de Benton et les codes de Wechsler. Une première stratégie est de considérer un seul test comme test de référence pour évaluer le niveau cognitif. La deuxième stratégie consiste à supposer que chaque test est une mesure avec erreur du niveau cognitif réel du sujet.
+
+#### Description des données
+
+Les données proviennent de la cohorte PAQUID au suivi à 10 ans. La table est contenue dans le fichier `{r}paquid-TD-LVM.txt` et inclut les variables suivantes :
+
+- ID : identifiant du sujet
+- age : age du sujet
+- dement : indicateur de démence = 1 si le sujet a été diagnostiqué dément / 0 sinon
+- IST : score au set test d’Isaacs tronqué à 15 secondes, test cognitif de fluence verbale noté entre 0 et 40
+- benton : score au test de rétention visuelle de Benton, test de mémoire visuelle noté entre 0 et 15
+- wechsler : score au test des codes de Wechsler, test des fonctions exécutives noté entre 0 et 90
+- mmse : score au test du Mini Mental State Examination, test de fonctionnement cognitif global noté entre 0 et 30
+- CEP : variable binaire =1 si le sujet a au moins le certificat d’études primaires; =0 sinon
+- homme :  variable binaire = 1 si le sujet est un homme et 0 si le sujet est une femme
+
+Le fichier a la forme suivante:
+
+```{r}
+rm(m)
+df = read.delim("paquid_TD_LVM.txt")
+head(df)
+names(df) = df %>% names %>% toupper
+```
+
+#### Définition du modèle linéaire
+
+```{r}
+mlIst = lvm()
+regression(mlIst) = IST ~ AGE + DEMENT + CEP + HOMME
+mlIstfit = estimate(mlIst,data=df)
+mlIstLM = lm(IST ~ AGE + DEMENT + CEP + HOMME, data = df)
+c(logLik(mlIstfit),
+  logLik(mlIstLM))
+summary(mlIstfit)
+summary(mlIstLM)
+
+mlBenton = lvm()
+regression(mlBenton) = BENTON ~ AGE + DEMENT + CEP + HOMME
+mlBentonfit = estimate(mlBenton,data=df)
+mlBentonLM = lm(BENTON ~ AGE + DEMENT + CEP + HOMME, data = df)
+c(logLik(mlBentonfit),
+  logLik(mlBentonLM))
+
+mlWechsler = lvm()
+regression(mlWechsler) = WECHSLER ~ AGE + DEMENT + CEP + HOMME
+mlWechslerfit = estimate(mlWechsler,data=df)
+mlWechslerLM = lm(WECHSLER ~ AGE + DEMENT + CEP + HOMME, data = df)
+c(logLik(mlWechslerfit),
+  logLik(mlWechslerLM))
+
+mlMmse = lvm()
+regression(mlMmse)  = MMSE ~ AGE + DEMENT + CEP + HOMME
+mlMmsefit = estimate(mlMmse,data=df)
+mlMmseLM = lm(MMSE ~ AGE + DEMENT + CEP + HOMME, data = df)
+c(logLik(mlMmsefit),
+  logLik(mlMmseLM))
+```
+
+Les modèles linéaires via `{r}lm()` et via `{r}lvm()` sont équivalents.
+
+```{r}
+coef(mlIstfit)
+summary(mlWechslerLM)
+```
+
+L'âge, la présence d'une démence, le niveau d'éducation bas et le sexe féminin sont associés à un déclin cognitif estimé par les scores MMSE, Benton, IST, Wechlser (à l'exception du sexe masculin pour le score de Wechsler qui n'est pas significatif).
+
+
+#### Définition du modèle à variables latentes
+```{r}
+mvl = lvm()
+latent(mvl) = ~ COG
+regression(mvl) = MMSE + IST + BENTON + WECHSLER ~ COG
+regression(mvl) = COG ~ AGE + DEMENT + CEP + HOMME
+plot(mvl, labels=T)
+```
+
+
+
+
+#### Description du modèle
+
+Modèle structurel :
+
+$$
+COG_i = \alpha_{0} + \alpha_{1}AGE_i + \alpha_{2}DEMENT_i + \alpha_{3}CEP_i + \alpha_{4}HOMME_i + \gamma_i
+$$
+
+Avec
+
+$$
+\gamma_i \sim \mathcal{N}\big(O,\sigma^2_\gamma\big)
+$$
+Modèle d'observation
+
+$$
+S_i = \begin{pmatrix}MMSE_{i} \\ IST_i \\ BENTON_i \\WECHSLER_i \end{pmatrix} = \beta_{0_S} + \beta_{1_S} COG_{i} + \epsilon_{S_i} \\
+$$
+
+avec 
+
+$$
+\epsilon_{S_i} \sim \mathcal{N}\Bigg( \begin{pmatrix}0\\0\\0\\0\end{pmatrix}, \Sigma_{\epsilon_{S}}\Bigg)
+$$
+
+On a :
+
+- 6 paramètres pour le modèle structurel
+- 8 paramètres pour les vecteurs $\beta_{0_S}$ et $\beta_{1_S}$
+- 10 paramètres pour la matrice de variance-covariance de la déviance individuelle du score SOM
+
+On ajoute une contrainte sur la position et la dispertion de COG :
+
+$$
+\alpha_0 = 0 \\
+\sigma^2_\gamma = 1
+$$
+
+```{r}
+intercept(mvl,~ COG) = 0
+covariance(mvl, ~ COG) = 1
+```
+
+
+#### Estimation du modèle
+
+```{r}
+mvlfit = estimate(mvl,data=df)
+plot(mvlfit,labels=T,diag=F,plain = F, intercept = T)
+summary(mvl)
+summary(mvlfit)
+```
+
+On note que :
+
+- Le déclin cognitif entraîne un déclin des scores MMSE, IST, BENTON, WECHSLER
+- L'âge, la démence, le niveau éducatif faible et le sexe féminin sont associés à un déclin cognitif.
+
+#### Modèle avec effet du sexe sur chaque test psychométrique
+
+```{r}
+mvl2 = lvm()
+latent(mvl2) = ~ COG
+regression(mvl2) = MMSE + IST + BENTON + WECHSLER ~ COG + HOMME
+regression(mvl2) = COG ~ AGE + DEMENT + CEP + HOMME
+intercept(mvl2,~ COG) = 0
+covariance(mvl2, ~ COG) = 1
+```
+
+```{r}
+mvl2fit = estimate(mvl2,data=df)
+plot(mvl2fit,labels=T,diag=F,plain = F, intercept = T)
+summary(mvl2)
+summary(mvl2fit)
+```
+
+#### Test si l'effet du sexe est différent selon le score
+
+```{r}
+dev = -2(logLik(mvlfit)-logLik(mvl2fit))
+p = 1-pchisq(dev,df=)
+```
+
+```{r}
+mvl3 = lvm()
+latent(mvl3) = ~ COG
+regression(mvl3) = MMSE + IST + BENTON + WECHSLER ~ COG + HOMME
+regression(mvl3) = COG ~ AGE + DEMENT + CEP
+intercept(mvl3,~ COG) = 0
+covariance(mvl3, ~ COG) = 1
+summary(mvl3)
+plot(mvl3)
+
+mvl3fit = estimate(mvl3,data=df)
+summary(mvl3fit)
+dev = -2(logLik(mvl3fit)-logLik(mvl2fit))
+p = 1-pchisq(dev,df=)
+```
+
+##### Discuter les avantages et limites de l'approche multivariée par rapport à l'approche univariée
+
+L'approche multivariée permet d'estimer la médiation de l'effet de la cognition sur les scores via la fonction cognitive. 
